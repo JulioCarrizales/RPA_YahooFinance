@@ -1,76 +1,56 @@
-import yfinance as yf
+import yfinance as finanzas
 import time
 from winotify import Notification, audio
 
-def get_price(ticker):
-     """
-     Obtiene el último precio de cierre ajustado de una acción.
+def obtener_precio(simbolo):
+    try:
+        accion = finanzas.Ticker(simbolo)
+        datos = accion.history(period="1d")
+        return datos['Close'].iloc[-1]
+    except Exception as error:
+        print(f"Error al obtener el precio de {simbolo}: {error}")
+        return None
 
-     Args:
-         ticker (str): El símbolo de cotización de la acción.
+def mostrar_alerta(simbolo, precio, estado):
+    accion = "vender" if estado == "superior" else "comprar"
+    notificacion = Notification(
+        app_id="Alerta de Acciones",
+        title=f"Alerta para {simbolo}",
+        msg=f"{simbolo} ha alcanzado un precio de {precio:.2f}. Considera {accion}.",
+    )
+    notificacion.add_actions(
+        label="Ir a Yahoo Finanzas",
+        launch=f"https://finance.yahoo.com/quote/{simbolo}",
+    )
+    notificacion.set_audio(audio.LoopingAlarm6, loop=True)
+    notificacion.show()
 
-     Returns:
-         float: El último precio de cierre ajustado, o None si hay un error.
-     """
-     try:
-         ticker_obj = yf.Ticker(ticker)
-         data = ticker_obj.history(period="1d")
-         return data['Close'].iloc[-1]
-     except Exception as e:
-         print(f"Error al obtener el precio de {ticker}: {e}")
-         return None
+def principal():
+    simbolo = input("Introduce el símbolo de la acción (ej: AAPL, META, NVDA): ").upper()
+    while True:
+        try:
+            limite_superior = float(input(f"Introduce el límite superior para {simbolo}: "))
+            limite_inferior = float(input(f"Introduce el límite inferior para {simbolo}: "))
+            if limite_superior <= limite_inferior:
+                print("El límite superior debe ser mayor al límite inferior. Intenta de nuevo.")
+            else:
+                break
+        except ValueError:
+            print("Entrada inválida. Por favor, introduce valores numéricos.")
 
-def show_notification(ticker, price, condition):
-     """
-     Muestra una notificación de escritorio.
-
-     Args:
-         ticker (str): El símbolo de cotización de la acción.
-         price (float): El precio actual de la acción.
-         condition (str): La condición que se cumplió ("above" o "below").
-     """
-     action = "sell" if condition == "above" else "buy"
-     toast = Notification(
-         app_id="Price Alert",
-         title=f"Price Alert for {ticker}",
-         msg=f"{ticker} has reached a price of {price:.2f}. You might want to {action}.",
-     )
-     toast.add_actions(
-         label="Go to Yahoo Finance",
-         launch=f"https://finance.yahoo.com/quote/{ticker}",
-     )
-     toast.set_audio(audio.LoopingAlarm6, loop=True)  # Añade loop=True
-     toast.show()
-
-def main():
-     """
-     Función principal que monitorea el precio de una acción y muestra notificaciones.
-     """
-     ticker = input("Enter the stock ticker (e.g., AAPL, META, NVDA): ").upper()
-     while True:
-         try:
-             upper_limit = float(input(f"Enter the upper price limit for {ticker}: "))
-             lower_limit = float(input(f"Enter the lower price limit for {ticker}: "))
-             if upper_limit <= lower_limit:
-                 print("The upper limit must be greater than the lower limit. Please try again.")
-             else:
-                 break
-         except ValueError:
-             print("Invalid input. Please enter numeric values for the limits.")
-
-     print(f"Monitoring {ticker}...")
-     while True:
-         price = get_price(ticker)
-         if price:
-             if price > upper_limit:
-                 show_notification(ticker, price, "above")
-                 print(f"{ticker} is above {upper_limit:.2f}")
-             elif price < lower_limit:
-                 show_notification(ticker, price, "below")
-                 print(f"{ticker} is below {lower_limit:.2f}")
-             else:
-                 print(f"Current price for {ticker}: {price:.2f}")
-         time.sleep(5)  # Puedes ajustar el intervalo de tiempo aquí
+    print(f"Monitorizando {simbolo}...")
+    while True:
+        precio = obtener_precio(simbolo)
+        if precio:
+            if precio > limite_superior:
+                mostrar_alerta(simbolo, precio, "superior")
+                print(f"{simbolo} está por encima de {limite_superior:.2f}")
+            elif precio < limite_inferior:
+                mostrar_alerta(simbolo, precio, "inferior")
+                print(f"{simbolo} está por debajo de {limite_inferior:.2f}")
+            else:
+                print(f"Precio actual de {simbolo}: {precio:.2f}")
+        time.sleep(5)
 
 if __name__ == "__main__":
-     main()
+    principal()
